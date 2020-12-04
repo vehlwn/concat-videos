@@ -32,7 +32,7 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-fname_regex = re.compile(R"(\d\d\d\d-\d\d-\d\d)_(\d\d).\d\d.\d\d_(\d+).mkv")
+fname_regex = re.compile(r"(\d\d\d\d-\d\d-\d\d)_(\d\d).\d\d.\d\d_(\d+).mkv")
 
 
 class ParsedEntry:
@@ -65,14 +65,23 @@ for cam_id, cam_group in itertools.groupby(entries, lambda x: x.cam_id):
         date_dir = os.path.join(cam_dir, date)
         os.makedirs(date_dir, exist_ok=True)
         for hour, hour_group in itertools.groupby(date_group, lambda x: x.hour):
+            output_fname = os.path.join(date_dir, f"{date}_{hour}.00.00.mkv")
             with tempfile.NamedTemporaryFile(delete=False) as file_files:
-                tmp_files_fname = file_files.name
                 input_small_files = []
+                tmp_files_fname = file_files.name
+                if os.path.exists(output_fname):
+                    output_fname_exists = True
+                    old_output_fname = output_fname + ".old"
+                    print(f"Output fname exists, renaming to '{old_output_fname}'")
+                    os.rename(output_fname, old_output_fname)
+                    input_small_files.append(old_output_fname)
+                    file_files.write(
+                        "file '{}'\n".format(old_output_fname).encode("utf-8")
+                    )
                 for x in hour_group:
                     s = os.path.abspath(x.f.path)
                     input_small_files.append(s)
                     file_files.write("file '{}'\n".format(s).encode("utf-8"))
-            output_fname = os.path.join(date_dir, f"{date}_{hour}.00.00.mkv")
             print(f"===={output_fname=}")
             print(f"{input_small_files=}")
             subprocess.run(
