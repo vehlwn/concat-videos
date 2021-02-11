@@ -55,13 +55,15 @@ class VideoFile:
         self.cam_id = cam_id
         self.audio_path = audio_path
 
-    def add_audio(self, out_fname: str):
+    def add_audio(self):
+        tmp_fname = self.video_path + ".old"
+        os.rename(self.video_path, tmp_fname)
         subprocess.run(
             [
                 "ffmpeg",
                 "-hide_banner",
                 "-i",
-                self.video_path,
+                tmp_fname,
                 "-i",
                 self.audio_path,
                 "-map",
@@ -71,10 +73,11 @@ class VideoFile:
                 "-c:v",
                 "copy",
                 "-shortest",
-                out_fname,
+                self.video_path,
             ],
             check=True,
         )
+        os.remove(tmp_fname)
 
 
 entries = []
