@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import argparse
+import os.path
 
 
 def _existing_dir(s: str):
@@ -32,23 +33,60 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-fname_regex = re.compile(r"(\d\d\d\d-\d\d-\d\d)_(\d\d).\d\d.\d\d_(\d+).mkv")
+VIDEO_EXT = ".mkv"
+AUDIO_EXT = ".wav"
+VIDEO_FNAME_REGEX = re.compile(
+    R"(\d\d\d\d-\d\d-\d\d)_(\d\d).\d\d.\d\d_(\d+)" + VIDEO_EXT
+)
 
 
-class ParsedEntry:
-    def __init__(self, f: os.DirEntry, date: str, hour: str, cam_id: str):
-        self.f = f
+class VideoFile:
+    def __init__(
+        self,
+        video_path: str,
+        date: str,
+        hour: str,
+        cam_id: str,
+        audio_path: str,
+    ):
+        self.video_path = video_path
         self.date = date
         self.hour = hour
         self.cam_id = cam_id
+        self.audio_path = audio_path
+
+    def add_audio(self, out_fname: str):
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-i",
+                self.video_path,
+                "-i",
+                self.audio_path,
+                "-map",
+                "0:v",
+                "-map",
+                "1:a",
+                "-c:v",
+                "copy",
+                "-shortest",
+                out_fname,
+            ],
+            check=True,
+        )
 
 
 entries = []
 for f in os.scandir(args.target_dir):
     if f.is_file():
-        m = fname_regex.match(f.name)
-        if m:
-            entries.append(ParsedEntry(f, m.group(1), m.group(2), m.group(3)))
+        m = VIDEO_FNAME_REGEX.match(f.name)
+        audio_path = os.path.splitext(f.path)[0] + AUDIO_EXT
+        if m and os.path.isfile(audio_path):
+            print(f"{audio_path=}")
+            entries.append(
+                VideoFile(f.path, m.group(1), m.group(2), m.group(3), audio_path)
+            )
 
 if not entries:
     print("No files found. Exitting.")
@@ -58,8 +96,7 @@ entries.sort(key=lambda x: x.hour)
 entries.sort(key=lambda x: x.date)
 entries.sort(key=lambda x: x.cam_id)
 for x in entries:
-    print(x.cam_id, x.date, x.hour, x.f.name)
-
+    print(x.video_path, x.date, x.hour)
 
 for cam_id, cam_group in itertools.groupby(entries, lambda x: x.cam_id):
     cam_dir = os.path.join(args.target_dir, "camera_" + cam_id)
@@ -81,7 +118,7 @@ for cam_id, cam_group in itertools.groupby(entries, lambda x: x.cam_id):
                         "file '{}'\n".format(old_output_fname).encode("utf-8")
                     )
                 for x in hour_group:
-                    s = os.path.abspath(x.f.path)
+                    s = os.path.abspath(x.video_path)
                     input_small_files.append(s)
                     file_files.write("file '{}'\n".format(s).encode("utf-8"))
             print(f"===={output_fname=}")
