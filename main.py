@@ -24,19 +24,12 @@ parser.add_argument(
     required=True,
     help="path to a directory where small files need to be concatenated",
 )
-parser.add_argument(
-    "--remove-input-files",
-    type=int,
-    default=1,
-    choices=[0, 1],
-    help="deletes input files after concatenation",
-)
 args = parser.parse_args()
 
 VIDEO_EXT = ".mkv"
 AUDIO_EXT = ".wav"
 VIDEO_FNAME_REGEX = re.compile(
-    R"(\d\d\d\d-\d\d-\d\d)_(\d\d).\d\d.\d\d_(\d+)" + VIDEO_EXT
+    R"(\d\d\d\d-\d\d-\d\d)_((\d\d).\d\d.\d\d)_(\d+)" + VIDEO_EXT
 )
 
 
@@ -45,18 +38,21 @@ class VideoFile:
         self,
         video_path: str,
         date: str,
+        time: str,
         hour: str,
         cam_id: str,
         audio_path: str,
     ):
         self.video_path = video_path
         self.date = date
+        self.time = time
         self.hour = hour
         self.cam_id = cam_id
         self.audio_path = audio_path
 
     def add_audio(self):
         tmp_fname = self.video_path + ".old"
+        print(f"rename {self.video_path=}, {tmp_fname=}")
         os.rename(self.video_path, tmp_fname)
         subprocess.run(
             [
@@ -77,7 +73,10 @@ class VideoFile:
             ],
             check=True,
         )
+        print(f"remove {tmp_fname}")
         os.remove(tmp_fname)
+        print(f"remove {self.audio_path}")
+        os.remove(self.audio_path)
 
 
 entries = []
@@ -86,20 +85,31 @@ for f in os.scandir(args.target_dir):
         m = VIDEO_FNAME_REGEX.match(f.name)
         audio_path = os.path.splitext(f.path)[0] + AUDIO_EXT
         if m and os.path.isfile(audio_path):
-            print(f"{audio_path=}")
             entries.append(
-                VideoFile(f.path, m.group(1), m.group(2), m.group(3), audio_path)
+                VideoFile(
+                    f.path,
+                    m.group(1),
+                    m.group(2),
+                    m.group(3),
+                    m.group(4),
+                    audio_path,
+                )
             )
 
 if not entries:
     print("No files found. Exitting.")
     sys.exit()
 
-entries.sort(key=lambda x: x.hour)
+entries.sort(key=lambda x: x.time)
 entries.sort(key=lambda x: x.date)
 entries.sort(key=lambda x: x.cam_id)
 for x in entries:
-    print(x.video_path, x.date, x.hour)
+    print(x.video_path, x.date, x.time, x.hour)
+print(f"{len(entries)=}")
+
+print("====Mixing audio...")
+for x in entries:
+    x.add_audio()
 
 for cam_id, cam_group in itertools.groupby(entries, lambda x: x.cam_id):
     cam_dir = os.path.join(args.target_dir, "camera_" + cam_id)
@@ -121,7 +131,7 @@ for cam_id, cam_group in itertools.groupby(entries, lambda x: x.cam_id):
                         "file '{}'\n".format(old_output_fname).encode("utf-8")
                     )
                 for x in hour_group:
-                    s = os.path.abspath(x.video_path)
+                    s = x.video_path
                     input_small_files.append(s)
                     file_files.write("file '{}'\n".format(s).encode("utf-8"))
             print(f"===={output_fname=}")
@@ -144,6 +154,5 @@ for cam_id, cam_group in itertools.groupby(entries, lambda x: x.cam_id):
                 check=True,
             )
             os.remove(tmp_files_fname)
-            if args.remove_input_files:
-                for y in input_small_files:
-                    os.remove(y)
+            for y in input_small_files:
+                os.remove(y)
