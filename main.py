@@ -4,9 +4,33 @@ import re
 import subprocess
 import sys
 import tempfile
+import argparse
 
-target_dir = "/home/vehlwn/projects/python/concat-videos/video"
-remove_small_files = True
+
+def _existing_dir(s: str):
+    if os.path.isdir(s):
+        return s
+    raise argparse.ArgumentTypeError(f"'{s}' is not an existing directory")
+
+
+parser = argparse.ArgumentParser(
+    description="Concatenate and group small videos by cam_id, date and hour",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+)
+parser.add_argument(
+    "--target-dir",
+    type=_existing_dir,
+    required=True,
+    help="path to a directory where small files need to be concatenated",
+)
+parser.add_argument(
+    "--remove-input-files",
+    type=int,
+    default=1,
+    choices=[0, 1],
+    help="deletes input files after concatenation",
+)
+args = parser.parse_args()
 
 fname_regex = re.compile(R"(\d\d\d\d-\d\d-\d\d)_(\d\d).\d\d.\d\d_(\d+)-\d+.mkv")
 
@@ -20,7 +44,7 @@ class ParsedEntry:
 
 
 entries = []
-for f in os.scandir(target_dir):
+for f in os.scandir(args.target_dir):
     if f.is_file():
         m = fname_regex.match(f.name)
         if m:
@@ -35,7 +59,7 @@ for x in entries:
     print(x.f.name, x.date, x.hour)
 
 for cam_id, cam_group in itertools.groupby(entries, lambda x: x.cam_id):
-    cam_dir = os.path.join(target_dir, "camera_" + cam_id)
+    cam_dir = os.path.join(args.target_dir, "camera_" + cam_id)
     os.makedirs(cam_dir, exist_ok=True)
     for date, date_group in itertools.groupby(cam_group, lambda x: x.date):
         date_dir = os.path.join(cam_dir, date)
@@ -45,7 +69,7 @@ for cam_id, cam_group in itertools.groupby(entries, lambda x: x.cam_id):
                 tmp_files_fname = file_files.name
                 input_small_files = []
                 for x in hour_group:
-                    s = os.path.abspath(x.f.name)
+                    s = os.path.abspath(x.f.path)
                     input_small_files.append(s)
                     file_files.write("file '{}'\n".format(s).encode("utf-8"))
             output_fname = os.path.join(date_dir, f"{date}_{hour}.00.00.mkv")
@@ -69,6 +93,6 @@ for cam_id, cam_group in itertools.groupby(entries, lambda x: x.cam_id):
                 check=True,
             )
             os.remove(tmp_files_fname)
-            if remove_small_files:
+            if args.remove_input_files:
                 for y in input_small_files:
                     os.remove(y)
