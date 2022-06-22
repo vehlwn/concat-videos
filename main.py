@@ -32,7 +32,7 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-fname_regex = re.compile(R"(\d\d\d\d-\d\d-\d\d)_(\d\d).\d\d.\d\d_(\d+)-\d+.mkv")
+fname_regex = re.compile(R"(\d\d\d\d-\d\d-\d\d)_(\d\d).\d\d.\d\d_(\d+).mkv")
 
 
 class ParsedEntry:
