@@ -70,7 +70,6 @@ for cam_id, cam_group in itertools.groupby(entries, lambda x: x.cam_id):
                 input_small_files = []
                 tmp_files_fname = file_files.name
                 if os.path.exists(output_fname):
-                    output_fname_exists = True
                     old_output_fname = output_fname + ".old"
                     print(f"Output fname exists, renaming to '{old_output_fname}'")
                     os.rename(output_fname, old_output_fname)
