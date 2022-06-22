@@ -49,14 +49,17 @@ for f in os.scandir(args.target_dir):
         m = fname_regex.match(f.name)
         if m:
             entries.append(ParsedEntry(f, m.group(1), m.group(2), m.group(3)))
-entries.sort(key=lambda x: x.f.name)
 
 if not entries:
     print("No files found. Exitting.")
     sys.exit()
 
+entries.sort(key=lambda x: x.hour)
+entries.sort(key=lambda x: x.date)
+entries.sort(key=lambda x: x.cam_id)
 for x in entries:
-    print(x.f.name, x.date, x.hour)
+    print(x.cam_id, x.date, x.hour, x.f.name)
+
 
 for cam_id, cam_group in itertools.groupby(entries, lambda x: x.cam_id):
     cam_dir = os.path.join(args.target_dir, "camera_" + cam_id)
